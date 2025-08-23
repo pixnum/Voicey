@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voicey Voice Recorder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='black'/><text x='12' y='16' font-size='12' text-anchor='middle' fill='white' font-family='Segoe UI, sans-serif' font-weight='bold'>V</text></svg>">
+<style>
+/* Reset */
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+
+/* Body & Transitions */
+body {
+  display: flex; justify-content: center; align-items: center; height: 100vh;
+  background: #121212; color: #fff;
+  transition: background 0.5s ease, color 0.5s ease;
+  perspective: 1000px;
+  overflow: hidden;
+}
+
+/* Glass Layers */
+.glass-layer {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; justify-content: center; align-items: center;
+  pointer-events: none;
+  border-radius: 30px;
+}
+.layer1 {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  transform: translateZ(0);
+}
+.layer2 {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 15px 50px rgba(0,0,0,0.2);
+  transform: translateZ(1px);
+}
+
+/* Container */
+.recorder-container {
+  pointer-events: auto;
+  position: relative;
+  z-index: 10;
+  background: rgba(255,255,255,0.05);
+  border-radius: 20px;
+  padding: 30px;
+  width: 90%;
+  max-width: 500px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  transition: background 0.5s ease, box-shadow 0.5s ease;
+}
+
+/* Glow animation */
+@keyframes glow {
+  0% { box-shadow: 0 0 10px #ff4b5c, 0 0 20px #ff4b5c; }
+  50% { box-shadow: 0 0 20px #ff6b7c, 0 0 40px #ff6b7c; }
+  100% { box-shadow: 0 0 10px #ff4b5c, 0 0 20px #ff4b5c; }
+}
+.recorder-container.recording { animation: glow 1s infinite alternate; }
+
+/* Header */
+h1 { margin-bottom: 20px; font-size: 1.8rem; }
+
+/* Buttons */
+.controls button {
+  background: linear-gradient(145deg, #1f1f1f, #2c2c2c);
+  border: none;
+  color: #fff;
+  padding: 15px 25px;
+  margin: 10px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: 0.3s;
+}
+.controls button:hover { transform: scale(1.05); }
+.controls button#recordBtn.recording { animation: glow 1s infinite alternate; }
+
+/* Audio Playback */
+audio {
+  margin-top: 20px;
+  width: 100%;
+  outline: none;
+  border-radius: 10px;
+  background: #1f1f1f;
+  transition: background 0.5s ease;
+}
+
+/* Canvas */
+canvas {
+  margin-top: 20px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(5px);
+  transition: background 0.5s ease;
+}
+
+/* Light Mode */
+body.light-mode { background: #f5f5f5; color: #000; }
+body.light-mode .recorder-container { background: rgba(0,0,0,0.05); color: #000; }
+body.light-mode .controls button { background: linear-gradient(145deg, #e0e0e0, #c0c0c0); color: #000; }
+body.light-mode audio { background: #e0e0e0; }
+body.light-mode canvas { background: rgba(0,0,0,0.05); }
+
+/* Dark Mode Toggle Button */
+.toggle-dark {
+  margin-top: 20px;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 50px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* Responsive */
+@media(max-width: 600px) {
+  .controls button { padding: 12px 20px; font-size: 0.9rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="glass-layer layer1">
+  <div class="glass-layer layer2">
+    <div class="recorder-container">
+      <h1>Voicey Voice Recorder</h1>
+      <div class="controls">
+        <button id="recordBtn">Record</button>
+        <button id="pauseBtn" disabled>Pause</button>
+        <button id="stopBtn" disabled>Stop</button>
+        <button id="downloadBtn" disabled>Download</button>
+      </div>
+      <audio id="audioPlayback" controls></audio>
+      <canvas id="waveform" width="400" height="100"></canvas>
+      <button class="toggle-dark" id="darkModeToggle">Switch to Light Mode</button>
+      <p style="margin-top:15px;font-size:0.8rem;">© Voicey 2025</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let mediaRecorder, audioChunks = [], audioBlob, audioUrl;
+let audio = document.getElementById('audioPlayback');
+
+const recordBtn = document.getElementById('recordBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+
+const canvas = document.getElementById('waveform');
+const ctx = canvas.getContext('2d');
+let audioContext, analyser, dataArray, source, animationId;
+
+// Dark/Light Mode Toggle
+const darkModeToggle = document.getElementById('darkModeToggle');
+function updateToggleText() {
+  darkModeToggle.textContent = document.body.classList.contains('light-mode') ? "Switch to Dark Mode" : "Switch to Light Mode";
+}
+updateToggleText();
+darkModeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('light-mode');
+  updateToggleText();
+});
+
+// Waveform drawing
+function drawWave() {
+  animationId = requestAnimationFrame(drawWave);
+  analyser.getByteTimeDomainData(dataArray);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  let sum = 0;
+  for(let i = 0; i < dataArray.length; i++) sum += Math.abs(dataArray[i] - 128);
+  const avg = sum / dataArray.length;
+
+  const intensity = Math.min(255, Math.max(50, avg * 2));
+  ctx.strokeStyle = `rgb(${intensity}, 50, ${255 - intensity})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  const sliceWidth = canvas.width / dataArray.length;
+  let x = 0;
+
+  for(let i = 0; i < dataArray.length; i++) {
+    const v = dataArray[i] / 128.0;
+    const y = v * canvas.height / 2;
+    if(i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+    x += sliceWidth;
+  }
+  ctx.lineTo(canvas.width, canvas.height/2);
+  ctx.stroke();
+}
+
+// Record Button
+recordBtn.addEventListener('click', async () => {
+  if(!mediaRecorder || mediaRecorder.state === 'inactive') {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    dataArray = new Uint8Array(analyser.fftSize);
+    drawWave();
+
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+      audioUrl = URL.createObjectURL(audioBlob);
+      audio.src = audioUrl;
+      audioChunks = [];
+      downloadBtn.disabled = false;
+      cancelAnimationFrame(animationId);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      recordBtn.classList.remove('recording');
+      document.querySelector('.recorder-container').classList.remove('recording');
+    };
+
+    mediaRecorder.start();
+    recordBtn.disabled = true;
+    pauseBtn.disabled = false;
+    stopBtn.disabled = false;
+
+    recordBtn.classList.add('recording');
+    document.querySelector('.recorder-container').classList.add('recording');
+  }
+});
+
+// Pause/Resume
+pauseBtn.addEventListener('click', () => {
+  if(mediaRecorder.state === 'recording') {
+    mediaRecorder.pause();
+    pauseBtn.textContent = 'Resume';
+  } else if(mediaRecorder.state === 'paused') {
+    mediaRecorder.resume();
+    pauseBtn.textContent = 'Pause';
+  }
+});
+
+// Stop
+stopBtn.addEventListener('click', () => {
+  mediaRecorder.stop();
+  recordBtn.disabled = false;
+  pauseBtn.disabled = true;
+  pauseBtn.textContent = 'Pause';
+  stopBtn.disabled = true;
+});
+
+// Download
+downloadBtn.addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = audioUrl;
+  a.download = 'VoiceyRecording.mp3';
+  a.click();
+});
+</script>
+
+</body>
+</html>
