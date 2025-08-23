@@ -1,257 +1,252 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Voicey - Pro Voice Recorder</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: linear-gradient(135deg, #1e1e2f, #121212);
-      color: white;
-      overflow: hidden;
-      transition: background 0.5s ease;
-    }
-    body.light {
-      background: linear-gradient(135deg, #ffffff, #dcdcdc);
-      color: black;
-    }
-    .recorder-container {
-      backdrop-filter: blur(15px) saturate(180%);
-      -webkit-backdrop-filter: blur(15px) saturate(180%);
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 20px;
-      padding: 30px;
-      text-align: center;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-      width: 360px;
-    }
-    h1 {
-      font-size: 1.5em;
-      margin-bottom: 15px;
-    }
-    button, select, input[type="range"] {
-      margin: 6px;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 12px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: transform 0.2s, background 0.3s;
-    }
-    button:hover, select:hover {
-      transform: scale(1.05);
-    }
-    #recordBtn { background: #ff4444; color: white; }
-    #pauseBtn { background: #ffbb33; color: black; }
-    #stopBtn { background: #33b5e5; color: white; }
-    #downloadBtn { background: #00C851; color: white; }
-    #darkModeToggle { background: #888; color: white; }
-    #timer {
-      font-size: 1.2em;
-      margin: 10px 0;
-    }
-    canvas {
-      width: 100%;
-      height: 80px;
-      border-radius: 12px;
-      background: rgba(0,0,0,0.2);
-      margin-top: 15px;
-    }
-    .controls {
-      margin: 10px 0;
-    }
-    footer {
-      margin-top: 15px;
-      font-size: 12px;
-      opacity: 0.7;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voicey - Voice Recorder</title>
+<style>
+  body {
+    margin: 0; height: 100vh;
+    display: flex; justify-content: center; align-items: center;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #111, #222);
+    overflow: hidden;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .app {
+    text-align: center; padding: 20px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(15px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+    border: 2px solid rgba(255,255,255,0.3);
+    width: 400px; max-width: 90%;
+    max-height: 80vh;        /* compact height */
+    overflow-y: auto;        /* internal scroll if content exceeds */
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    z-index: 10;
+    cursor: grab;
+  }
+
+  h1 { margin-bottom: 10px; }
+  .controls { margin: 15px 0; }
+  button, select, input[type=range], input[type=number] {
+    margin: 8px; padding: 10px 16px; border-radius: 12px; border: none;
+    background: rgba(255,255,255,0.15); color: white; font-size: 14px;
+    cursor: pointer; backdrop-filter: blur(10px);
+    transition: background 0.3s, transform 0.2s;
+  }
+  button:hover, select:hover { background: rgba(255,255,255,0.3); transform: scale(1.05); }
+  input[type=range] { width: 80%; }
+  #timer { font-size: 18px; margin: 10px 0; font-weight: bold; }
+  audio { margin-top: 15px; width: 100%; }
+  canvas { margin-top: 15px; border-radius: 12px; background: rgba(255,255,255,0.05); height: 80px; }
+  .dark-mode { background: linear-gradient(135deg, #e3e3e3, #b8b8b8); color: black; }
+  .dark-mode .app { background: rgba(0,0,0,0.1); color: black; }
+</style>
 </head>
 <body>
-  <div class="recorder-container">
-    <h1>🎙️ Voicey</h1>
+<div class="app">
+  <h1>🎙️ Voicey</h1>
+  <div id="timer">00:00:00</div>
 
-    <div id="timer">00:00:00</div>
-
-    <div class="controls">
-      <button id="recordBtn">Start Recording</button>
-      <button id="pauseBtn" disabled>Pause</button>
-      <button id="stopBtn" disabled>Stop</button>
-      <button id="downloadBtn" disabled>Download</button>
-    </div>
-
-    <div class="controls">
-      <label>Format: 
-        <select id="formatSelect">
-          <option value="wav">WAV</option>
-          <option value="mp3">MP3</option>
-        </select>
-      </label>
-      <label>Bitrate: 
-        <select id="bitrateSelect">
-          <option value="96000">96 kbps</option>
-          <option value="128000" selected>128 kbps</option>
-          <option value="192000">192 kbps</option>
-        </select>
-      </label>
-      <label>Sample Rate: 
-        <select id="sampleRateSelect">
-          <option value="44100" selected>44.1 kHz</option>
-          <option value="48000">48 kHz</option>
-        </select>
-      </label>
-    </div>
-
-    <div class="controls">
-      <label>Gain: 
-        <input type="range" id="gainControl" min="0" max="2" step="0.1" value="1">
-      </label>
-    </div>
-
-    <canvas id="visualizer"></canvas>
-
-    <audio id="audioPlayback" controls style="width:100%; margin-top:10px;"></audio>
-
-    <div class="controls">
-      <button id="darkModeToggle">Toggle Dark Mode</button>
-    </div>
-
-    <footer>© Voicey 2025</footer>
+  <div class="controls">
+    <button id="recordBtn">Start</button>
+    <button id="pauseBtn" disabled>Pause</button>
+    <button id="stopBtn" disabled>Stop</button>
   </div>
 
-<script>
-let mediaRecorder, audioChunks = [], audioUrl;
-let audioContext, analyser, source, gainNode;
-let startTime, timerInterval;
-let canvas = document.getElementById('visualizer');
-let ctx = canvas.getContext('2d');
+  <div class="controls">
+    <label>Sample Rate:</label>
+    <select id="sampleRateSelect">
+      <option value="44100">44.1 kHz</option>
+      <option value="48000">48 kHz</option>
+    </select>
+    <br>
+    <label>Bitrate:</label>
+    <select id="bitrateSelect">
+      <option value="96000">96 kbps</option>
+      <option value="128000">128 kbps</option>
+    </select>
+  </div>
 
-// Timer
+  <div class="controls">
+    <label>Gain</label><br>
+    <input type="range" id="gainControl" min="0.5" max="3" step="0.1" value="1">
+  </div>
+
+  <div class="controls">
+    <label>Noise Gate Threshold</label><br>
+    <input type="range" id="noiseGateControl" min="1" max="20" step="1" value="5">
+  </div>
+
+  <audio id="audioPlayback" controls></audio>
+  <canvas id="waveform" width="400" height="80" style="width:100%;"></canvas>
+
+  <div class="controls">
+    <label>Start Time (s):</label>
+    <input type="number" id="editStart" min="0" value="0" step="0.1">
+    <label>End Time (s):</label>
+    <input type="number" id="editEnd" min="0" value="0" step="0.1">
+    <br>
+    <button id="trimBtn" disabled>Trim</button>
+    <button id="cutBtn" disabled>Cut</button>
+  </div>
+
+  <div class="controls">
+    <button id="downloadBtn" disabled>Download</button>
+    <button id="deleteBtn" disabled>Delete</button>
+    <button id="resetBtn">Reset</button>
+    <button id="toggleMode">🌙 Toggle Mode</button>
+  </div>
+</div>
+
+<script>
+// Variables
+let mediaRecorder, audioChunks = [];
+let audioContext, source, gainNode, gate, analyserNode;
+let timerInterval, startTime;
+let audioUrl;
+let gateThreshold = 5;
+
+// DOM Elements
+const recordBtn = document.getElementById('recordBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const deleteBtn = document.getElementById('deleteBtn');
+const resetBtn = document.getElementById('resetBtn');
+const toggleModeBtn = document.getElementById('toggleMode');
+
+const trimBtn = document.getElementById('trimBtn');
+const cutBtn = document.getElementById('cutBtn');
+const editStart = document.getElementById('editStart');
+const editEnd = document.getElementById('editEnd');
+
+const canvas = document.getElementById('waveform');
+const ctx = canvas.getContext('2d');
+
+// Dark Mode Toggle
+toggleModeBtn.onclick = () => { document.body.classList.toggle("dark-mode"); };
+
+// Timer Functions
 function startTimer() {
   startTime = Date.now();
   timerInterval = setInterval(() => {
-    let elapsed = Date.now() - startTime;
-    let seconds = Math.floor(elapsed / 1000) % 60;
-    let minutes = Math.floor(elapsed / (1000*60)) % 60;
-    let hours = Math.floor(elapsed / (1000*60*60));
-    document.getElementById('timer').textContent =
-      String(hours).padStart(2,'0') + ":" +
-      String(minutes).padStart(2,'0') + ":" +
-      String(seconds).padStart(2,'0');
+    let diff = Date.now() - startTime;
+    let h = String(Math.floor(diff / 3600000)).padStart(2,'0');
+    let m = String(Math.floor((diff % 3600000) / 60000)).padStart(2,'0');
+    let s = String(Math.floor((diff % 60000) / 1000)).padStart(2,'0');
+    document.getElementById("timer").innerText = `${h}:${m}:${s}`;
   }, 1000);
 }
-function stopTimer() {
-  clearInterval(timerInterval);
-}
+function stopTimer() { clearInterval(timerInterval); document.getElementById("timer").innerText = "00:00:00"; }
 
-// Start Recording
-document.getElementById('recordBtn').onclick = async () => {
-  let stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true
-    }
-  });
-
-  audioContext = new (window.AudioContext || window.webkitAudioContext)({
-    sampleRate: parseInt(document.getElementById('sampleRateSelect').value)
-  });
-
-  source = audioContext.createMediaStreamSource(stream);
-  analyser = audioContext.createAnalyser();
-  gainNode = audioContext.createGain();
-  gainNode.gain.value = document.getElementById('gainControl').value;
-
-  source.connect(gainNode).connect(analyser).connect(audioContext.destination);
-
-  mediaRecorder = new MediaRecorder(stream, {
-    mimeType: 'audio/webm;codecs=opus',
-    audioBitsPerSecond: parseInt(document.getElementById('bitrateSelect').value)
-  });
-
-  audioChunks = [];
-  mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-  mediaRecorder.onstop = () => {
-    let blob = new Blob(audioChunks, { type: 'audio/webm' });
-    audioUrl = URL.createObjectURL(blob);
-    document.getElementById('audioPlayback').src = audioUrl;
-
-    let now = new Date();
-    let filename = `Voicey_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}.${document.getElementById('formatSelect').value}`;
-    document.getElementById('downloadBtn').onclick = () => {
-      const a = document.createElement('a');
-      a.href = audioUrl;
-      a.download = filename;
-      a.click();
-    };
-    document.getElementById('downloadBtn').disabled = false;
-  };
-
-  mediaRecorder.start();
-  startTimer();
-  drawVisualizer();
-
-  document.getElementById('recordBtn').disabled = true;
-  document.getElementById('pauseBtn').disabled = false;
-  document.getElementById('stopBtn').disabled = false;
-};
-
-// Pause / Resume
-document.getElementById('pauseBtn').onclick = () => {
-  if (mediaRecorder.state === 'recording') {
-    mediaRecorder.pause();
-    stopTimer();
-    document.getElementById('pauseBtn').textContent = 'Resume';
-  } else if (mediaRecorder.state === 'paused') {
-    mediaRecorder.resume();
-    startTimer();
-    document.getElementById('pauseBtn').textContent = 'Pause';
-  }
-};
-
-// Stop
-document.getElementById('stopBtn').onclick = () => {
-  mediaRecorder.stop();
-  stopTimer();
-  document.getElementById('recordBtn').disabled = false;
-  document.getElementById('pauseBtn').disabled = true;
-  document.getElementById('pauseBtn').textContent = 'Pause';
-  document.getElementById('stopBtn').disabled = true;
-};
-
-// Gain Control
-document.getElementById('gainControl').oninput = (e) => {
-  if (gainNode) gainNode.gain.value = e.target.value;
-};
+// Noise Gate & Gain
+document.getElementById('noiseGateControl').addEventListener('input', e => { gateThreshold = parseInt(e.target.value); });
+document.getElementById('gainControl').addEventListener('input', e => { if(gainNode) gainNode.gain.value = e.target.value; });
 
 // Visualizer
 function drawVisualizer() {
   requestAnimationFrame(drawVisualizer);
-  let bufferLength = analyser.frequencyBinCount;
-  let dataArray = new Uint8Array(bufferLength);
-  analyser.getByteFrequencyData(dataArray);
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  let barWidth = (canvas.width / bufferLength) * 2.5;
+  if(!analyserNode) return;
+  const bufferLength = analyserNode.fftSize;
+  const dataArray = new Uint8Array(bufferLength);
+  analyserNode.getByteTimeDomainData(dataArray);
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.lineWidth = 2; ctx.strokeStyle = "lime"; ctx.beginPath();
+  const sliceWidth = canvas.width / bufferLength;
   let x = 0;
-  for (let i = 0; i < bufferLength; i++) {
-    let barHeight = dataArray[i]/2;
-    ctx.fillStyle = 'rgb(' + (barHeight+100) + ',50,200)';
-    ctx.fillRect(x, canvas.height - barHeight/2, barWidth, barHeight);
-    x += barWidth + 1;
+  for(let i=0;i<bufferLength;i++){
+    const v = dataArray[i]/128.0;
+    const y = v*canvas.height/2;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    x += sliceWidth;
   }
+  ctx.lineTo(canvas.width, canvas.height/2); ctx.stroke();
 }
 
-// Dark Mode
-document.getElementById('darkModeToggle').onclick = () => {
-  document.body.classList.toggle('light');
+// Recording Functions
+recordBtn.onclick = async () => {
+  let stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 }});
+  audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: parseInt(document.getElementById('sampleRateSelect').value) });
+  source = audioContext.createMediaStreamSource(stream);
+  let highpass = audioContext.createBiquadFilter(); highpass.type="highpass"; highpass.frequency.value=150;
+  analyserNode = audioContext.createAnalyser(); analyserNode.fftSize = 256;
+  gate = audioContext.createGain(); gate.gain.value = 1;
+
+  function noiseGateCheck(){
+    requestAnimationFrame(noiseGateCheck);
+    let data = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteTimeDomainData(data);
+    let rms = Math.sqrt(data.reduce((s,v)=>s+(v-128)**2,0)/data.length);
+    gate.gain.value = rms > gateThreshold ? 1 : 0;
+  }
+  noiseGateCheck();
+
+  gainNode = audioContext.createGain(); gainNode.gain.value = parseFloat(document.getElementById('gainControl').value);
+  source.connect(highpass).connect(analyserNode).connect(gate).connect(gainNode).connect(audioContext.destination);
+
+  mediaRecorder = new MediaRecorder(stream,{ mimeType:'audio/webm;codecs=opus', audioBitsPerSecond: parseInt(document.getElementById('bitrateSelect').value) });
+  audioChunks = [];
+  mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+  mediaRecorder.onstop = () => {
+    let blob = new Blob(audioChunks,{type:'audio/webm'});
+    audioUrl = URL.createObjectURL(blob);
+    document.getElementById('audioPlayback').src = audioUrl;
+    downloadBtn.disabled = false; deleteBtn.disabled = false;
+    trimBtn.disabled = false; cutBtn.disabled = false;
+    editEnd.value = document.getElementById('audioPlayback').duration || 0;
+  };
+
+  mediaRecorder.start();
+  startTimer(); drawVisualizer();
+  recordBtn.disabled=true; pauseBtn.disabled=false; stopBtn.disabled=false;
 };
+
+pauseBtn.onclick = () => {
+  if(mediaRecorder.state==="recording"){ mediaRecorder.pause(); pauseBtn.textContent="Resume"; }
+  else { mediaRecorder.resume(); pauseBtn.textContent="Pause"; }
+};
+
+stopBtn.onclick = () => {
+  if(mediaRecorder.state!=="inactive") mediaRecorder.stop();
+  stopTimer();
+  recordBtn.disabled=false; pauseBtn.disabled=true; pauseBtn.textContent="Pause"; stopBtn.disabled=true;
+};
+
+downloadBtn.onclick = () => {
+  if(!audioUrl) return;
+  let now = new Date();
+  let filename = `Voicey_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}.webm`;
+  const a=document.createElement('a'); a.href=audioUrl; a.download=filename; a.click();
+};
+
+deleteBtn.onclick = () => {
+  if(!audioUrl) return; audioChunks=[]; audioUrl=null;
+  document.getElementById('audioPlayback').src='';
+  downloadBtn.disabled=true; deleteBtn.disabled=true;
+  trimBtn.disabled=true; cutBtn.disabled=true;
+};
+
+resetBtn.onclick = () => {
+  if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
+  audioChunks=[]; audioUrl=null; document.getElementById('audioPlayback').src='';
+  downloadBtn.disabled=true; deleteBtn.disabled=true; trimBtn.disabled=true; cutBtn.disabled=true;
+  stopTimer();
+  document.getElementById("timer").innerText="00:00:00";
+  recordBtn.disabled=false; pauseBtn.disabled=true; pauseBtn.textContent="Pause"; stopBtn.disabled=true;
+};
+
+// Draggable App Frame
+const appDiv = document.querySelector('.app');
+let isDragging = false, offsetX, offsetY;
+appDiv.onmousedown = (e) => { isDragging = true; offsetX = e.clientX - appDiv.offsetLeft; offsetY = e.clientY - appDiv.offsetTop; };
+document.onmouseup = () => isDragging = false;
+document.onmousemove = (e) => { if(!isDragging) return; appDiv.style.left = `${e.clientX - offsetX}px`; appDiv.style.top = `${e.clientY - offsetY}px`; };
 </script>
 </body>
 </html>
