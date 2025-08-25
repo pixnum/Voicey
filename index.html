@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voicey Voice Recorder</title>
+<title>Voicey - Voice Recorder</title>
 <style>
 body{margin:0;padding:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#121212;color:#fff;font-family:'Segoe UI',sans-serif;}
 .app-frame{border:2px solid rgba(255,255,255,0.3);border-radius:25px;padding:20px;background:rgba(255,255,255,0.05);backdrop-filter:blur(12px);width:95%;max-width:600px;text-align:center;box-shadow:0 15px 35px rgba(0,0,0,0.5);transition:all 0.3s;}
@@ -14,10 +14,11 @@ audio{margin-top:20px;width:100%;outline:none;border-radius:10px;background:#1f1
 .toggle-dark{margin-top:20px;background:transparent;border:1px solid #fff;border-radius:25px;padding:10px 20px;cursor:pointer;transition:all 0.3s;}
 .toggle-dark:hover{background:rgba(255,255,255,0.1);}
 .canvas-container{position:relative;margin-top:20px;}
-canvas{width:100%;height:100px;border-radius:10px;background: rgba(0,0,0,0.1);}
+canvas{width:100%;height:150px;border-radius:10px;background: rgba(0,0,0,0.1);}
 .vu-meter{position:absolute;top:0;right:10px;width:20px;height:100%;background: rgba(255,255,255,0.05);border-radius:10px;overflow:hidden;}
 .vu-bar{width:100%;height:0%;background:lime;transition:height 0.05s;}
 .db-display{position:absolute;top:0;right:40px;font-size:0.9rem;color:#0ff;}
+.timer-display{display:block;margin-top:10px;font-size:1.2rem;font-weight:bold;color:#0ff;}
 @media(max-width:600px){.controls button, select{padding:8px 12px;font-size:0.9rem;}}
 body.light-mode{background:#f5f5f5;color:#000;}
 body.light-mode .app-frame{background: rgba(0,0,0,0.05);border: 2px solid rgba(0,0,0,0.3);color:#000;}
@@ -30,7 +31,7 @@ body.light-mode canvas{background: rgba(255,255,255,0.05);}
 </head>
 <body>
 <div class="app-frame">
-<h1>Voicey Voice Recorder</h1>
+<h1>Voicey</h1>
 <div class="controls">
 <select id="wavRate">
   <option value="22050">WAV: 22050 Hz</option>
@@ -42,6 +43,7 @@ body.light-mode canvas{background: rgba(255,255,255,0.05);}
 <button id="pauseBtn" disabled>Pause</button>
 <button id="stopBtn" disabled>Stop</button>
 <button id="downloadWav" disabled>Download WAV</button>
+<span class="timer-display" id="timerDisplay">00:00</span>
 </div>
 <div class="canvas-container">
 <canvas id="waveform"></canvas>
@@ -54,13 +56,14 @@ body.light-mode canvas{background: rgba(255,255,255,0.05);}
 </div>
 
 <script>
-let mediaRecorder, audioChunks=[], recordedBuffer=[];
+let mediaRecorder, audioChunks=[], recordedBuffer=[], timerInterval=0, seconds=0;
 const audio=document.getElementById('audioPlayback');
 const recordBtn=document.getElementById('recordBtn');
 const pauseBtn=document.getElementById('pauseBtn');
 const stopBtn=document.getElementById('stopBtn');
 const downloadWav=document.getElementById('downloadWav');
 const wavRateSelect=document.getElementById('wavRate');
+const timerDisplay=document.getElementById('timerDisplay');
 const canvas=document.getElementById('waveform');
 const ctx=canvas.getContext('2d');
 const vuBar=document.getElementById('vuBar');
@@ -78,84 +81,68 @@ function getColorForAmplitude(value){
   return '#ff0000';
 }
 
-function drawWaveform(){
-  animationId=requestAnimationFrame(drawWaveform);
+function drawWaveformStereo(leftData,rightData){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const halfHeight=canvas.height/2;
+  function drawChannel(data, yOffset){
+    ctx.beginPath();
+    let sliceWidth=canvas.width/data.length;
+    let x=0;
+    let peak=0;
+    for(let i=0;i<data.length;i++){
+      let v=(data[i]-128)/128;
+      if(Math.abs(v)>peak) peak=Math.abs(v);
+      let y=v*halfHeight + yOffset;
+      ctx.lineTo(x,y);
+      x+=sliceWidth;
+    }
+    ctx.strokeStyle='#0ff';
+    ctx.lineWidth=2;
+    ctx.stroke();
+    return peak;
+  }
+  let peakLeft=drawChannel(leftData,halfHeight/2);
+  let peakRight=drawChannel(rightData,halfHeight + halfHeight/2);
+  let rms=(peakLeft+peakRight)/2;
+  let db=Math.max(-60,20*Math.log10(rms));
+  dbDisplay.textContent=db.toFixed(1)+' dB';
+  vuBar.style.height=Math.min(100,rms*200)+'%';
+}
+
+function drawLoop(){
+  animationId=requestAnimationFrame(drawLoop);
   if(!analyser) return;
   analyser.getByteTimeDomainData(dataArray);
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.lineWidth=3;
-  let sliceWidth=canvas.width/dataArray.length;
-  let x=0;
-  let sumSquares=0;
-  let peak=0;
+  // Split stereo channels (approximation)
+  let left=[], right=[];
   for(let i=0;i<dataArray.length;i++){
-    let v=Math.abs(dataArray[i]-128)/128;
-    sumSquares+=v*v;
-    if(v>peak) peak=v;
-    let y=(v*canvas.height/2)+(canvas.height/4);
-    ctx.strokeStyle=getColorForAmplitude(v);
-    ctx.shadowBlur=10; ctx.shadowColor=ctx.strokeStyle;
-    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    x+=sliceWidth;
+    if(i%2===0) left.push(dataArray[i]); else right.push(dataArray[i]);
   }
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.strokeStyle='#ff00ff'; ctx.lineWidth=2;
-  ctx.moveTo(0,canvas.height*(1-peak)); ctx.lineTo(canvas.width,canvas.height*(1-peak));
-  ctx.stroke();
-  let rms=Math.sqrt(sumSquares/dataArray.length);
-  let db=Math.max(-60,20*Math.log10(rms));
-  let heightPerc=Math.min(100,Math.max(0,rms*200));
-  vuBar.style.height=heightPerc+'%';
-  dbDisplay.textContent=db.toFixed(1)+' dB';
+  drawWaveformStereo(left,right);
 }
 
-function mergeBuffers(buffers){
-  let totalLength=0;
-  buffers.forEach(b=>totalLength+=b.byteLength);
-  let tmp=new Uint8Array(totalLength);
-  let offset=0;
-  buffers.forEach(b=>{ tmp.set(new Uint8Array(b),offset); offset+=b.byteLength; });
-  return tmp.buffer;
-}
+// Timer
+function startTimer(){seconds=0; timerDisplay.textContent='00:00'; timerInterval=setInterval(()=>{
+  seconds++;
+  let m=Math.floor(seconds/60).toString().padStart(2,'0');
+  let s=(seconds%60).toString().padStart(2,'0');
+  timerDisplay.textContent=`${m}:${s}`;
+},1000);}
+function stopTimer(){clearInterval(timerInterval); timerDisplay.textContent='00:00';}
 
-function encodeWAV(samples, sampleRate){
-  const buffer=new ArrayBuffer(44+samples.length*2);
-  const view=new DataView(buffer);
-  function writeString(v,offset,str){for(let i=0;i<str.length;i++)v.setUint8(offset+i,str.charCodeAt(i));}
-  let offset=0;
-  writeString(view,offset,'RIFF'); offset+=4;
-  view.setUint32(offset,36+samples.length*2,true); offset+=4;
-  writeString(view,offset,'WAVE'); offset+=4;
-  writeString(view,offset,'fmt '); offset+=4;
-  view.setUint32(offset,16,true); offset+=4;
-  view.setUint16(offset,1,true); offset+=2;
-  view.setUint16(offset,1,true); offset+=2;
-  view.setUint32(offset,sampleRate,true); offset+=4;
-  view.setUint32(offset,sampleRate*2,true); offset+=4;
-  view.setUint16(offset,2,true); offset+=2;
-  view.setUint16(offset,16,true); offset+=2;
-  writeString(view,offset,'data'); offset+=4;
-  view.setUint32(offset,samples.length*2,true); offset+=4;
-  let pos=44;
-  for(let i=0;i<samples.length;i++){
-    let s=Math.max(-1,Math.min(1,samples[i]));
-    view.setInt16(pos,s<0?s*0x8000:s*0x7FFF,true);
-    pos+=2;
-  }
-  return new Blob([view],{type:'audio/wav'});
-}
-
+// Recording
 recordBtn.addEventListener('click', async ()=>{
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{sampleRate:44100,channelCount:2,noiseSuppression:true,echoCancellation:true,autoGainControl:true}});
     audioCtx=new (window.AudioContext||window.webkitAudioContext)();
     source=audioCtx.createMediaStreamSource(stream);
+    const filter=audioCtx.createBiquadFilter();
+    filter.type='lowpass'; filter.frequency.value=15000;
     analyser=audioCtx.createAnalyser();
     analyser.fftSize=2048;
     dataArray=new Uint8Array(analyser.fftSize);
-    source.connect(analyser);
-    drawWaveform();
+    source.connect(filter); filter.connect(analyser);
+    drawLoop();
     mediaRecorder=new MediaRecorder(stream);
     audioChunks=[]; recordedBuffer=[];
     mediaRecorder.ondataavailable=e=>{
@@ -164,35 +151,62 @@ recordBtn.addEventListener('click', async ()=>{
       reader.onloadend=()=>recordedBuffer.push(reader.result);
       reader.readAsArrayBuffer(e.data);
     };
-    mediaRecorder.onstop=()=>{
+    mediaRecorder.onstop=async()=>{
       const blob=new Blob(audioChunks,{type:'audio/webm'});
       audio.src=URL.createObjectURL(blob);
       downloadWav.disabled=false;
       cancelAnimationFrame(animationId);
+      stopTimer();
     };
     mediaRecorder.start();
     recordBtn.disabled=true; pauseBtn.disabled=false; stopBtn.disabled=false; downloadWav.disabled=true;
-  }catch(err){alert('Microphone access denied or not available'); console.error(err);}
+    startTimer();
+  }catch(err){alert('Microphone access denied'); console.error(err);}
 });
 
 pauseBtn.addEventListener('click', ()=>{
-  if(mediaRecorder.state==='recording'){ mediaRecorder.pause(); pauseBtn.textContent='Resume'; }
-  else if(mediaRecorder.state==='paused'){ mediaRecorder.resume(); pauseBtn.textContent='Pause'; }
+  if(mediaRecorder.state==='recording'){ mediaRecorder.pause(); pauseBtn.textContent='Resume'; stopTimer(); }
+  else if(mediaRecorder.state==='paused'){ mediaRecorder.resume(); pauseBtn.textContent='Pause'; startTimer(); }
 });
 
 stopBtn.addEventListener('click', ()=>{
   if(mediaRecorder&&(mediaRecorder.state==='recording'||mediaRecorder.state==='paused')) mediaRecorder.stop();
   recordBtn.disabled=false; pauseBtn.disabled=true; stopBtn.disabled=true; pauseBtn.textContent='Pause';
+  stopTimer();
 });
 
 downloadWav.addEventListener('click', async ()=>{
   if(recordedBuffer.length){
     const wavRate=parseInt(wavRateSelect.value);
-    const mergedBuffer=mergeBuffers(recordedBuffer);
+    const mergedBuffer=new Uint8Array(recordedBuffer.reduce((acc,b)=>acc+new Uint8Array(b).length,0));
+    let offset=0;
+    for(let b of recordedBuffer){
+      let arr=new Uint8Array(b);
+      mergedBuffer.set(arr,offset);
+      offset+=arr.length;
+    }
     const audioCtx2=new (window.AudioContext||window.webkitAudioContext)();
-    const audioData=await audioCtx2.decodeAudioData(mergedBuffer);
-    const samples=audioData.getChannelData(0);
-    const wavBlob=encodeWAV(samples,wavRate);
+    const audioData=await audioCtx2.decodeAudioData(mergedBuffer.buffer);
+    const left=audioData.getChannelData(0);
+    const right=audioData.numberOfChannels>1?audioData.getChannelData(1):left;
+    // Interleave stereo
+    const interleaved=new Float32Array(left.length*2);
+    for(let i=0;i<left.length;i++){ interleaved[i*2]=left[i]; interleaved[i*2+1]=right[i]; }
+    function encodeWAV(samples, sampleRate){
+      const buffer=new ArrayBuffer(44+samples.length*2);
+      const view=new DataView(buffer);
+      function writeString(v,o,s){for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+      let offset=0; writeString(view,offset,'RIFF'); offset+=4;
+      view.setUint32(offset,36+samples.length*2,true); offset+=4; writeString(view,offset,'WAVE'); offset+=4;
+      writeString(view,offset,'fmt '); offset+=4; view.setUint32(offset,16,true); offset+=4;
+      view.setUint16(offset,1,true); offset+=2; view.setUint16(offset,2,true); offset+=2;
+      view.setUint32(offset,sampleRate,true); offset+=4; view.setUint32(offset,sampleRate*4,true); offset+=4;
+      view.setUint16(offset,4,true); offset+=2; view.setUint16(offset,16,true); offset+=2;
+      writeString(view,offset,'data'); offset+=4; view.setUint32(offset,samples.length*2,true); offset+=4;
+      let pos=44; for(let i=0;i<samples.length;i++){ let s=Math.max(-1,Math.min(1,samples[i])); view.setInt16(pos,s<0?s*0x8000:s*0x7FFF,true); pos+=2; }
+      return new Blob([view],{type:'audio/wav'});
+    }
+    const wavBlob=encodeWAV(interleaved,wavRate);
     const a=document.createElement('a'); a.href=URL.createObjectURL(wavBlob); a.download='VoiceyRecording.wav'; a.click();
   }
 });
