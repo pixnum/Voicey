@@ -4,249 +4,185 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Voicey - Voice Recorder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='black'/><path d='M12 8v8M8 12h8' stroke='white' stroke-width='2'/></svg>">
 <style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',sans-serif; }
+
   body {
-    margin: 0; height: 100vh;
-    display: flex; justify-content: center; align-items: center;
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg, #111, #222);
-    overflow: hidden;
-    transition: background 0.3s, color 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #121212;
+    color: #fff;
+    transition: all 0.3s;
   }
 
-  .app {
-    text-align: center; padding: 20px;
-    border-radius: 20px;
-    background: rgba(255,255,255,0.1);
-    backdrop-filter: blur(15px);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  .app-frame {
     border: 2px solid rgba(255,255,255,0.3);
-    width: 400px; max-width: 90%;
-    max-height: 80vh;        /* compact height */
-    overflow-y: auto;        /* internal scroll if content exceeds */
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%,-50%);
-    z-index: 10;
-    cursor: grab;
+    border-radius: 25px;
+    padding: 20px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+    width: 95%;
+    max-width: 550px;
+    text-align: center;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+    transition: all 0.3s;
   }
 
-  h1 { margin-bottom: 10px; }
-  .controls { margin: 15px 0; }
-  button, select, input[type=range], input[type=number] {
-    margin: 8px; padding: 10px 16px; border-radius: 12px; border: none;
-    background: rgba(255,255,255,0.15); color: white; font-size: 14px;
-    cursor: pointer; backdrop-filter: blur(10px);
-    transition: background 0.3s, transform 0.2s;
+  h1 { margin-bottom: 20px; font-size: 1.8rem; }
+
+  .controls button {
+    background: linear-gradient(145deg, #1f1f1f, #2c2c2c);
+    border: none;
+    color: #fff;
+    padding: 15px 25px;
+    margin: 10px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: 0.3s;
   }
-  button:hover, select:hover { background: rgba(255,255,255,0.3); transform: scale(1.05); }
-  input[type=range] { width: 80%; }
-  #timer { font-size: 18px; margin: 10px 0; font-weight: bold; }
-  audio { margin-top: 15px; width: 100%; }
-  canvas { margin-top: 15px; border-radius: 12px; background: rgba(255,255,255,0.05); height: 80px; }
-  .dark-mode { background: linear-gradient(135deg, #e3e3e3, #b8b8b8); color: black; }
-  .dark-mode .app { background: rgba(0,0,0,0.1); color: black; }
+
+  .controls button:hover {
+    background: linear-gradient(145deg, #2c2c2c, #1f1f1f);
+    transform: scale(1.05);
+  }
+
+  audio {
+    margin-top: 20px;
+    width: 100%;
+    outline: none;
+    border-radius: 10px;
+    background: #1f1f1f;
+    transition: all 0.3s;
+  }
+
+  .toggle-dark {
+    margin-top: 20px;
+    background: transparent;
+    border: 1px solid #fff;
+    border-radius: 25px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .toggle-dark:hover { background: rgba(255,255,255,0.1); }
+
+  @media(max-width:600px){
+    .controls button { padding:12px 20px; font-size:0.9rem; }
+  }
+
+  body.light-mode {
+    background: #f5f5f5;
+    color: #000;
+  }
+
+  body.light-mode .app-frame {
+    background: rgba(0,0,0,0.05);
+    border: 2px solid rgba(0,0,0,0.3);
+    color: #000;
+  }
+
+  body.light-mode .controls button {
+    background: linear-gradient(145deg, #e0e0e0, #c0c0c0);
+    color: #000;
+  }
+
+  body.light-mode .controls button:hover {
+    background: linear-gradient(145deg, #c0c0c0, #e0e0e0);
+  }
+
+  body.light-mode audio {
+    background: #e0e0e0;
+  }
+
+  body.light-mode .toggle-dark {
+    border: 1px solid #000;
+  }
 </style>
 </head>
 <body>
-<div class="app">
-  <h1>🎙️ Voicey</h1>
-  <div id="timer">00:00:00</div>
 
+<div class="app-frame">
+  <h1>Voicey</h1>
   <div class="controls">
-    <button id="recordBtn">Start</button>
+    <button id="recordBtn">Record</button>
     <button id="pauseBtn" disabled>Pause</button>
     <button id="stopBtn" disabled>Stop</button>
-  </div>
-
-  <div class="controls">
-    <label>Sample Rate:</label>
-    <select id="sampleRateSelect">
-      <option value="44100">44.1 kHz</option>
-      <option value="48000">48 kHz</option>
-    </select>
-    <br>
-    <label>Bitrate:</label>
-    <select id="bitrateSelect">
-      <option value="96000">96 kbps</option>
-      <option value="128000">128 kbps</option>
-    </select>
-  </div>
-
-  <div class="controls">
-    <label>Gain</label><br>
-    <input type="range" id="gainControl" min="0.5" max="3" step="0.1" value="1">
-  </div>
-
-  <div class="controls">
-    <label>Noise Gate Threshold</label><br>
-    <input type="range" id="noiseGateControl" min="1" max="20" step="1" value="5">
-  </div>
-
-  <audio id="audioPlayback" controls></audio>
-  <canvas id="waveform" width="400" height="80" style="width:100%;"></canvas>
-
-  <div class="controls">
-    <label>Start Time (s):</label>
-    <input type="number" id="editStart" min="0" value="0" step="0.1">
-    <label>End Time (s):</label>
-    <input type="number" id="editEnd" min="0" value="0" step="0.1">
-    <br>
-    <button id="trimBtn" disabled>Trim</button>
-    <button id="cutBtn" disabled>Cut</button>
-  </div>
-
-  <div class="controls">
     <button id="downloadBtn" disabled>Download</button>
-    <button id="deleteBtn" disabled>Delete</button>
-    <button id="resetBtn">Reset</button>
-    <button id="toggleMode">🌙 Toggle Mode</button>
   </div>
+  <audio id="audioPlayback" controls></audio>
+  <button class="toggle-dark" id="darkModeToggle">Toggle Dark Mode</button>
+  <p style="margin-top:15px;font-size:0.8rem;">© Voicey 2025</p>
 </div>
 
 <script>
-// Variables
-let mediaRecorder, audioChunks = [];
-let audioContext, source, gainNode, gate, analyserNode;
-let timerInterval, startTime;
+let mediaRecorder;
+let audioChunks = [];
+let audioBlob;
 let audioUrl;
-let gateThreshold = 5;
+let audio = document.getElementById('audioPlayback');
 
-// DOM Elements
 const recordBtn = document.getElementById('recordBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const stopBtn = document.getElementById('stopBtn');
 const downloadBtn = document.getElementById('downloadBtn');
-const deleteBtn = document.getElementById('deleteBtn');
-const resetBtn = document.getElementById('resetBtn');
-const toggleModeBtn = document.getElementById('toggleMode');
 
-const trimBtn = document.getElementById('trimBtn');
-const cutBtn = document.getElementById('cutBtn');
-const editStart = document.getElementById('editStart');
-const editEnd = document.getElementById('editEnd');
+recordBtn.addEventListener('click', async () => {
+  if(!mediaRecorder || mediaRecorder.state === 'inactive'){
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
 
-const canvas = document.getElementById('waveform');
-const ctx = canvas.getContext('2d');
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      audioBlob = new Blob(audioChunks, { type:'audio/mp3' });
+      audioUrl = URL.createObjectURL(audioBlob);
+      audio.src = audioUrl;
+      audioChunks = [];
+      downloadBtn.disabled = false;
+    };
+
+    mediaRecorder.start();
+    recordBtn.disabled = true;
+    pauseBtn.disabled = false;
+    stopBtn.disabled = false;
+  }
+});
+
+pauseBtn.addEventListener('click', () => {
+  if(mediaRecorder.state === 'recording'){
+    mediaRecorder.pause();
+    pauseBtn.textContent = 'Resume';
+  } else if(mediaRecorder.state === 'paused'){
+    mediaRecorder.resume();
+    pauseBtn.textContent = 'Pause';
+  }
+});
+
+stopBtn.addEventListener('click', () => {
+  mediaRecorder.stop();
+  recordBtn.disabled = false;
+  pauseBtn.disabled = true;
+  pauseBtn.textContent = 'Pause';
+  stopBtn.disabled = true;
+});
+
+downloadBtn.addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = audioUrl;
+  a.download = 'VoiceyRecording.mp3';
+  a.click();
+});
 
 // Dark Mode Toggle
-toggleModeBtn.onclick = () => { document.body.classList.toggle("dark-mode"); };
-
-// Timer Functions
-function startTimer() {
-  startTime = Date.now();
-  timerInterval = setInterval(() => {
-    let diff = Date.now() - startTime;
-    let h = String(Math.floor(diff / 3600000)).padStart(2,'0');
-    let m = String(Math.floor((diff % 3600000) / 60000)).padStart(2,'0');
-    let s = String(Math.floor((diff % 60000) / 1000)).padStart(2,'0');
-    document.getElementById("timer").innerText = `${h}:${m}:${s}`;
-  }, 1000);
-}
-function stopTimer() { clearInterval(timerInterval); document.getElementById("timer").innerText = "00:00:00"; }
-
-// Noise Gate & Gain
-document.getElementById('noiseGateControl').addEventListener('input', e => { gateThreshold = parseInt(e.target.value); });
-document.getElementById('gainControl').addEventListener('input', e => { if(gainNode) gainNode.gain.value = e.target.value; });
-
-// Visualizer
-function drawVisualizer() {
-  requestAnimationFrame(drawVisualizer);
-  if(!analyserNode) return;
-  const bufferLength = analyserNode.fftSize;
-  const dataArray = new Uint8Array(bufferLength);
-  analyserNode.getByteTimeDomainData(dataArray);
-  ctx.fillStyle = "rgba(255,255,255,0.05)";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.lineWidth = 2; ctx.strokeStyle = "lime"; ctx.beginPath();
-  const sliceWidth = canvas.width / bufferLength;
-  let x = 0;
-  for(let i=0;i<bufferLength;i++){
-    const v = dataArray[i]/128.0;
-    const y = v*canvas.height/2;
-    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    x += sliceWidth;
-  }
-  ctx.lineTo(canvas.width, canvas.height/2); ctx.stroke();
-}
-
-// Recording Functions
-recordBtn.onclick = async () => {
-  let stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 }});
-  audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: parseInt(document.getElementById('sampleRateSelect').value) });
-  source = audioContext.createMediaStreamSource(stream);
-  let highpass = audioContext.createBiquadFilter(); highpass.type="highpass"; highpass.frequency.value=150;
-  analyserNode = audioContext.createAnalyser(); analyserNode.fftSize = 256;
-  gate = audioContext.createGain(); gate.gain.value = 1;
-
-  function noiseGateCheck(){
-    requestAnimationFrame(noiseGateCheck);
-    let data = new Uint8Array(analyserNode.frequencyBinCount);
-    analyserNode.getByteTimeDomainData(data);
-    let rms = Math.sqrt(data.reduce((s,v)=>s+(v-128)**2,0)/data.length);
-    gate.gain.value = rms > gateThreshold ? 1 : 0;
-  }
-  noiseGateCheck();
-
-  gainNode = audioContext.createGain(); gainNode.gain.value = parseFloat(document.getElementById('gainControl').value);
-  source.connect(highpass).connect(analyserNode).connect(gate).connect(gainNode).connect(audioContext.destination);
-
-  mediaRecorder = new MediaRecorder(stream,{ mimeType:'audio/webm;codecs=opus', audioBitsPerSecond: parseInt(document.getElementById('bitrateSelect').value) });
-  audioChunks = [];
-  mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-  mediaRecorder.onstop = () => {
-    let blob = new Blob(audioChunks,{type:'audio/webm'});
-    audioUrl = URL.createObjectURL(blob);
-    document.getElementById('audioPlayback').src = audioUrl;
-    downloadBtn.disabled = false; deleteBtn.disabled = false;
-    trimBtn.disabled = false; cutBtn.disabled = false;
-    editEnd.value = document.getElementById('audioPlayback').duration || 0;
-  };
-
-  mediaRecorder.start();
-  startTimer(); drawVisualizer();
-  recordBtn.disabled=true; pauseBtn.disabled=false; stopBtn.disabled=false;
-};
-
-pauseBtn.onclick = () => {
-  if(mediaRecorder.state==="recording"){ mediaRecorder.pause(); pauseBtn.textContent="Resume"; }
-  else { mediaRecorder.resume(); pauseBtn.textContent="Pause"; }
-};
-
-stopBtn.onclick = () => {
-  if(mediaRecorder.state!=="inactive") mediaRecorder.stop();
-  stopTimer();
-  recordBtn.disabled=false; pauseBtn.disabled=true; pauseBtn.textContent="Pause"; stopBtn.disabled=true;
-};
-
-downloadBtn.onclick = () => {
-  if(!audioUrl) return;
-  let now = new Date();
-  let filename = `Voicey_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}.webm`;
-  const a=document.createElement('a'); a.href=audioUrl; a.download=filename; a.click();
-};
-
-deleteBtn.onclick = () => {
-  if(!audioUrl) return; audioChunks=[]; audioUrl=null;
-  document.getElementById('audioPlayback').src='';
-  downloadBtn.disabled=true; deleteBtn.disabled=true;
-  trimBtn.disabled=true; cutBtn.disabled=true;
-};
-
-resetBtn.onclick = () => {
-  if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
-  audioChunks=[]; audioUrl=null; document.getElementById('audioPlayback').src='';
-  downloadBtn.disabled=true; deleteBtn.disabled=true; trimBtn.disabled=true; cutBtn.disabled=true;
-  stopTimer();
-  document.getElementById("timer").innerText="00:00:00";
-  recordBtn.disabled=false; pauseBtn.disabled=true; pauseBtn.textContent="Pause"; stopBtn.disabled=true;
-};
-
-// Draggable App Frame
-const appDiv = document.querySelector('.app');
-let isDragging = false, offsetX, offsetY;
-appDiv.onmousedown = (e) => { isDragging = true; offsetX = e.clientX - appDiv.offsetLeft; offsetY = e.clientY - appDiv.offsetTop; };
-document.onmouseup = () => isDragging = false;
-document.onmousemove = (e) => { if(!isDragging) return; appDiv.style.left = `${e.clientX - offsetX}px`; appDiv.style.top = `${e.clientY - offsetY}px`; };
+const darkModeToggle = document.getElementById('darkModeToggle');
+darkModeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('light-mode');
+});
 </script>
+
 </body>
 </html>
