@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voicey - Voice Recorder</title>
+<title>Voicey Voice Recorder</title>
 <style>
 body{margin:0;padding:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#121212;color:#fff;font-family:'Segoe UI',sans-serif;}
 .app-frame{border:2px solid rgba(255,255,255,0.3);border-radius:25px;padding:20px;background:rgba(255,255,255,0.05);backdrop-filter:blur(12px);width:95%;max-width:600px;text-align:center;box-shadow:0 15px 35px rgba(0,0,0,0.5);transition:all 0.3s;}
@@ -30,25 +30,18 @@ body.light-mode canvas{background: rgba(255,255,255,0.05);}
 </head>
 <body>
 <div class="app-frame">
-<h1>Voicey</h1>
+<h1>Voicey Voice Recorder</h1>
 <div class="controls">
 <select id="wavRate">
   <option value="22050">WAV: 22050 Hz</option>
   <option value="44100" selected>WAV: 44100 Hz</option>
   <option value="48000">WAV: 48000 Hz</option>
 </select>
-<select id="mp3Rate">
-  <option value="64">MP3: 64 kbps</option>
-  <option value="128" selected>MP3: 128 kbps</option>
-  <option value="192">MP3: 192 kbps</option>
-  <option value="256">MP3: 256 kbps</option>
-</select>
 <br>
 <button id="recordBtn">Record</button>
 <button id="pauseBtn" disabled>Pause</button>
 <button id="stopBtn" disabled>Stop</button>
 <button id="downloadWav" disabled>Download WAV</button>
-<button id="downloadMp3" disabled>Download MP3</button>
 </div>
 <div class="canvas-container">
 <canvas id="waveform"></canvas>
@@ -60,7 +53,6 @@ body.light-mode canvas{background: rgba(255,255,255,0.05);}
 <p style="margin-top:15px;font-size:0.8rem;">© Voicey 2025</p>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js"></script>
 <script>
 let mediaRecorder, audioChunks=[], recordedBuffer=[];
 const audio=document.getElementById('audioPlayback');
@@ -68,9 +60,7 @@ const recordBtn=document.getElementById('recordBtn');
 const pauseBtn=document.getElementById('pauseBtn');
 const stopBtn=document.getElementById('stopBtn');
 const downloadWav=document.getElementById('downloadWav');
-const downloadMp3=document.getElementById('downloadMp3');
 const wavRateSelect=document.getElementById('wavRate');
-const mp3RateSelect=document.getElementById('mp3Rate');
 const canvas=document.getElementById('waveform');
 const ctx=canvas.getContext('2d');
 const vuBar=document.getElementById('vuBar');
@@ -113,10 +103,9 @@ function drawWaveform(){
   ctx.strokeStyle='#ff00ff'; ctx.lineWidth=2;
   ctx.moveTo(0,canvas.height*(1-peak)); ctx.lineTo(canvas.width,canvas.height*(1-peak));
   ctx.stroke();
-  // VU Meter
-  let rms = Math.sqrt(sumSquares/dataArray.length);
-  let db = Math.max(-60,20*Math.log10(rms));
-  let heightPerc=Math.min(100, Math.max(0,rms*200));
+  let rms=Math.sqrt(sumSquares/dataArray.length);
+  let db=Math.max(-60,20*Math.log10(rms));
+  let heightPerc=Math.min(100,Math.max(0,rms*200));
   vuBar.style.height=heightPerc+'%';
   dbDisplay.textContent=db.toFixed(1)+' dB';
 }
@@ -157,7 +146,6 @@ function encodeWAV(samples, sampleRate){
   return new Blob([view],{type:'audio/wav'});
 }
 
-// Event listeners and recording logic simplified for compatibility
 recordBtn.addEventListener('click', async ()=>{
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
@@ -180,11 +168,10 @@ recordBtn.addEventListener('click', async ()=>{
       const blob=new Blob(audioChunks,{type:'audio/webm'});
       audio.src=URL.createObjectURL(blob);
       downloadWav.disabled=false;
-      downloadMp3.disabled=false;
       cancelAnimationFrame(animationId);
     };
     mediaRecorder.start();
-    recordBtn.disabled=true; pauseBtn.disabled=false; stopBtn.disabled=false; downloadWav.disabled=true; downloadMp3.disabled=true;
+    recordBtn.disabled=true; pauseBtn.disabled=false; stopBtn.disabled=false; downloadWav.disabled=true;
   }catch(err){alert('Microphone access denied or not available'); console.error(err);}
 });
 
@@ -193,7 +180,10 @@ pauseBtn.addEventListener('click', ()=>{
   else if(mediaRecorder.state==='paused'){ mediaRecorder.resume(); pauseBtn.textContent='Pause'; }
 });
 
-stopBtn.addEventListener('click', ()=>{ if(mediaRecorder&&(mediaRecorder.state==='recording'||mediaRecorder.state==='paused')) mediaRecorder.stop(); recordBtn.disabled=false; pauseBtn.disabled=true; stopBtn.disabled=true; pauseBtn.textContent='Pause'; });
+stopBtn.addEventListener('click', ()=>{
+  if(mediaRecorder&&(mediaRecorder.state==='recording'||mediaRecorder.state==='paused')) mediaRecorder.stop();
+  recordBtn.disabled=false; pauseBtn.disabled=true; stopBtn.disabled=true; pauseBtn.textContent='Pause';
+});
 
 downloadWav.addEventListener('click', async ()=>{
   if(recordedBuffer.length){
@@ -204,27 +194,6 @@ downloadWav.addEventListener('click', async ()=>{
     const samples=audioData.getChannelData(0);
     const wavBlob=encodeWAV(samples,wavRate);
     const a=document.createElement('a'); a.href=URL.createObjectURL(wavBlob); a.download='VoiceyRecording.wav'; a.click();
-  }
-});
-
-downloadMp3.addEventListener('click', async ()=>{
-  if(recordedBuffer.length){
-    const mp3Rate=parseInt(mp3RateSelect.value);
-    const mergedBuffer=mergeBuffers(recordedBuffer);
-    const audioCtx2=new (window.AudioContext||window.webkitAudioContext)();
-    const audioData=await audioCtx2.decodeAudioData(mergedBuffer);
-    const samples=audioData.getChannelData(0);
-    const mp3encoder=new lamejs.Mp3Encoder(1,audioData.sampleRate,mp3Rate);
-    let mp3Data=[];
-    let sampleBlock=1152;
-    for(let i=0;i<samples.length;i+=sampleBlock){
-      let chunk=samples.subarray(i,i+sampleBlock);
-      let buf=mp3encoder.encodeBuffer(Float32Array.from(chunk));
-      if(buf.length>0) mp3Data.push(buf);
-    }
-    let bufFlush=mp3encoder.flush(); if(bufFlush.length>0) mp3Data.push(bufFlush);
-    const blob=new Blob(mp3Data,{type:'audio/mp3'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='VoiceyRecording.mp3'; a.click();
   }
 });
 
